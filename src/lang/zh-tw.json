@@ -201,6 +201,8 @@
   "play_prev": "上一曲",
   "play_single": "停用歌曲切換",
   "play_single_loop": "重複播放",
+  "play_queue": "播放佇列",
+  "play_queue_empty": "播放佇列為空",
   "player__buffering": "緩衝中...",
   "player__end": "播放完畢",
   "player__error": "音訊載入出錯，5 秒後切換下一首",
