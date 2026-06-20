@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, TouchableOpacity, FlatList, type FlatListProps } from 'react-native'
+import { View, TouchableOpacity, FlatList } from 'react-native'
 import { pop } from '@/navigation'
 import { useTheme } from '@/store/theme/hook'
 import { usePlayInfo } from '@/store/player/hook'
 import { useStatusbarHeight } from '@/store/common/hook'
 import { useI18n } from '@/lang'
-import { playList } from '@/core/player/player'
+import { playList, playNext } from '@/core/player/player'
+import { removeTempPlayList } from '@/core/player/tempPlayList'
 import { getListMusicSync } from '@/utils/listManage'
 import { createStyle } from '@/utils/tools'
 import { scaleSizeH } from '@/utils/pixelRatio'
@@ -21,23 +22,34 @@ import listState from '@/store/list/state'
 const HEADER_HEIGHT = scaleSizeH(_HEADER_HEIGHT)
 const ITEM_HEIGHT = scaleSizeH(LIST_ITEM_HEIGHT)
 
-type FlatListType = FlatListProps<LX.Music.MusicInfo>
+type QueueItem = {
+  type: 'list'
+  musicInfo: LX.Music.MusicInfo
+  originalIndex: number
+} | {
+  type: 'tempPlay'
+  musicInfo: LX.Music.MusicInfo
+  tempPlayIndex: number
+}
 
 interface Props {
   componentId: string
 }
 
-const ListItem = ({ item, index, isActive, isPlaying, onPress, isShowAlbumName, isShowInterval }: {
-  item: LX.Music.MusicInfo
+const ListItem = ({ item, index, isPlaying, onPress, isShowAlbumName, isShowInterval }: {
+  item: QueueItem
   index: number
-  isActive: boolean
   isPlaying: boolean
-  onPress: (item: LX.Music.MusicInfo, index: number) => void
+  onPress: (item: QueueItem, index: number) => void
   isShowAlbumName: boolean
   isShowInterval: boolean
 }) => {
   const theme = useTheme()
-  const singer = `${item.singer}${isShowAlbumName && item.meta.albumName ? ` · ${item.meta.albumName}` : ''}`
+  const t = useI18n()
+  const musicInfo = item.musicInfo
+  const singer = `${musicInfo.singer}${isShowAlbumName && musicInfo.meta.albumName ? ` · ${musicInfo.meta.albumName}` : ''}`
+  const isActive = item.type === 'list' && item.originalIndex === playerState.playInfo.playIndex && !playerState.playMusicInfo.isTempPlay
+  const isTempPlayActive = item.type === 'tempPlay' && playerState.playMusicInfo.isTempPlay && playerState.playMusicInfo.musicInfo?.id === musicInfo.id
 
   return (
     <TouchableOpacity
@@ -46,22 +58,25 @@ const ListItem = ({ item, index, isActive, isPlaying, onPress, isShowAlbumName, 
       activeOpacity={0.5}
     >
       {
-        isActive && isPlaying
+        (isActive || isTempPlayActive) && isPlaying
           ? <Icon style={styles.sn} name="play-outline" size={13} color={theme['c-primary-font']} />
-          : <Text style={styles.sn} size={13} color={isActive ? theme['c-primary-font'] : theme['c-300']}>{index + 1}</Text>
+          : <Text style={styles.sn} size={13} color={isActive || isTempPlayActive ? theme['c-primary-font'] : theme['c-300']}>{index + 1}</Text>
       }
       <View style={styles.itemInfo}>
-        <Text color={isActive ? theme['c-primary-font'] : theme['c-font']} numberOfLines={1}>{item.name}</Text>
+        <Text color={isActive || isTempPlayActive ? theme['c-primary-font'] : theme['c-font']} numberOfLines={1}>{musicInfo.name}</Text>
         <View style={styles.itemMeta}>
-          <Badge>{item.source.toUpperCase()}</Badge>
-          <Text style={styles.itemMetaText} size={11} color={isActive ? theme['c-primary-alpha-200'] : theme['c-500']} numberOfLines={1}>
+          {item.type === 'tempPlay' ? (
+            <Badge>{t('play_later')}</Badge>
+          ) : null}
+          <Badge>{musicInfo.source.toUpperCase()}</Badge>
+          <Text style={styles.itemMetaText} size={11} color={isActive || isTempPlayActive ? theme['c-primary-alpha-200'] : theme['c-500']} numberOfLines={1}>
             {singer}
           </Text>
         </View>
       </View>
       {
         isShowInterval ? (
-          <Text size={12} color={isActive ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{item.interval}</Text>
+          <Text size={12} color={isActive || isTempPlayActive ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{musicInfo.interval}</Text>
         ) : null
       }
     </TouchableOpacity>
@@ -76,67 +91,103 @@ export default ({ componentId }: Props) => {
   const isShowAlbumName = useSettingValue('list.isShowAlbumName')
   const isShowInterval = useSettingValue('list.isShowInterval')
   const flatListRef = useRef<FlatList>(null)
-  const [list, setList] = useState<LX.List.ListMusics>([])
+  const [queueList, setQueueList] = useState<QueueItem[]>([])
 
   const listId = playInfo.playerListId
 
-  const updateList = useCallback(() => {
+  const buildQueueList = useCallback(() => {
     if (!listId) {
-      setList([])
+      setQueueList([])
       return
     }
     const musicList = getListMusicSync(listId)
-    setList([...musicList])
-  }, [listId])
+    const playIndex = playInfo.playIndex
+    const tempPlayList = playerState.tempPlayList
+
+    // 当前歌曲之前（含当前歌曲）的列表
+    const beforeItems: QueueItem[] = musicList
+      .slice(0, playIndex + 1)
+      .map((musicInfo, i) => ({ type: 'list' as const, musicInfo, originalIndex: i }))
+
+    // 稍后播放列表
+    const tempPlayItems: QueueItem[] = tempPlayList.map((item, i) => ({
+      type: 'tempPlay' as const,
+      musicInfo: item.musicInfo as LX.Music.MusicInfo,
+      tempPlayIndex: i,
+    }))
+
+    // 当前歌曲之后的列表
+    const afterItems: QueueItem[] = musicList
+      .slice(playIndex + 1)
+      .map((musicInfo, i) => ({ type: 'list' as const, musicInfo, originalIndex: playIndex + 1 + i }))
+
+    setQueueList([...beforeItems, ...tempPlayItems, ...afterItems])
+  }, [listId, playInfo.playIndex])
 
   useEffect(() => {
-    updateList()
+    buildQueueList()
     const handleListUpdate = (ids: string[]) => {
       if (listId && ids.includes(listId)) {
-        updateList()
+        buildQueueList()
       }
     }
+    const handleTempPlayListUpdate = () => {
+      buildQueueList()
+    }
     global.app_event.on('myListMusicUpdate', handleListUpdate)
+    global.state_event.on('playTempPlayListChanged', handleTempPlayListUpdate)
     return () => {
       global.app_event.off('myListMusicUpdate', handleListUpdate)
+      global.state_event.off('playTempPlayListChanged', handleTempPlayListUpdate)
     }
-  }, [updateList])
+  }, [buildQueueList])
 
   // Scroll to current playing song
   useEffect(() => {
-    if (playInfo.playIndex > -1 && list.length > 0) {
+    const currentIndex = queueList.findIndex(item =>
+      item.type === 'list' && item.originalIndex === playInfo.playIndex
+    )
+    if (currentIndex > -1 && queueList.length > 0) {
       try {
         flatListRef.current?.scrollToIndex({
-          index: playInfo.playIndex,
+          index: currentIndex,
           viewPosition: 0.3,
           animated: false,
         })
       } catch {}
     }
-  }, [list.length, playInfo.playIndex])
+  }, [queueList.length, playInfo.playIndex])
 
-  const handlePlay = useCallback((item: LX.Music.MusicInfo, index: number) => {
-    if (!listId) return
-    void playList(listId, index)
+  const handlePlay = useCallback((item: QueueItem, _index: number) => {
+    if (item.type === 'list') {
+      if (!listId) return
+      void playList(listId, item.originalIndex)
+    } else {
+      // 点击稍后播放歌曲：移除该歌曲之前的所有 tempPlayList 项，使目标成为第一项，然后通过 playNext 播放
+      for (let i = 0; i < item.tempPlayIndex; i++) {
+        removeTempPlayList(0)
+      }
+      // 现在目标歌曲位于 tempPlayList[0]，playNext 会自动取出并播放
+      void playNext()
+    }
   }, [listId])
 
   const handleBack = () => {
     void pop(componentId)
   }
 
-  const renderItem: FlatListType['renderItem'] = ({ item, index }) => (
+  const renderItem = ({ item, index }: { item: QueueItem; index: number }) => (
     <ListItem
       item={item}
       index={index}
-      isActive={playInfo.playIndex === index}
       isPlaying={playerState.isPlay}
       onPress={handlePlay}
       isShowAlbumName={isShowAlbumName}
       isShowInterval={isShowInterval}
     />
   )
-  const getkey: FlatListType['keyExtractor'] = item => item.id
-  const getItemLayout: FlatListType['getItemLayout'] = (data, index) => {
+  const getkey = (item: QueueItem) => item.type === 'list' ? item.musicInfo.id : `temp_${item.tempPlayIndex}_${item.musicInfo.id}`
+  const getItemLayout = (_data: any, index: number) => {
     return { length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index }
   }
 
@@ -163,16 +214,16 @@ export default ({ componentId }: Props) => {
         </View>
       </View>
       {
-        list.length > 0
+        queueList.length > 0
           ? <FlatList
               ref={flatListRef}
               style={styles.list}
-              data={list}
+              data={queueList}
               maxToRenderPerBatch={8}
               windowSize={10}
               removeClippedSubviews={true}
               initialNumToRender={15}
-              renderItem={renderItem}
+              renderItem={renderItem as any}
               keyExtractor={getkey}
               getItemLayout={getItemLayout}
             />
