@@ -76,7 +76,7 @@ const ListItem = ({ item, index, isPlaying, onPress, isShowAlbumName, isShowInte
       </View>
       {
         isShowInterval ? (
-          <Text size={12} color={isActive || isTempPlayActive ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{musicInfo.interval}</Text>
+          <Text style={styles.interval} size={12} color={isActive || isTempPlayActive ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{musicInfo.interval}</Text>
         ) : null
       }
     </TouchableOpacity>
@@ -283,6 +283,9 @@ const styles = createStyle({
     flexGrow: 0,
     flexShrink: 1,
     fontWeight: '300',
+  },
+  interval: {
+    paddingRight: 8,
   },
   empty: {
     flex: 1,
