@@ -11,9 +11,12 @@ import Other from './settings/Other'
 import Version from './settings/Version'
 import About from './settings/About'
 
+import Download from './settings/Download'
+
 export const SETTING_SCREENS = [
   'basic',
   'player',
+  'download',
   'lyric_desktop',
   'search',
   'list',
@@ -49,6 +52,7 @@ const Main = forwardRef<MainType, {}>((props, ref) => {
   const component = useMemo(() => {
     switch (id) {
       case 'player': return <Player />
+      case 'download': return <Download />
       case 'lyric_desktop': return <LyricDesktop />
       case 'search': return <Search />
       case 'list': return <List />

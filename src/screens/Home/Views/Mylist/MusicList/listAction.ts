@@ -1,6 +1,7 @@
 import { addListMusics, removeListMusics, updateListMusicPosition, updateListMusics } from '@/core/list'
 import { playList, playListById, playNext } from '@/core/player/player'
 import { addTempPlayList } from '@/core/player/tempPlayList'
+import { downloadMusic } from '@/core/download'
 import settingState from '@/store/setting/state'
 import { similar, sortInsert, toOldMusicInfo } from '@/utils'
 import { confirmDialog, openUrl, shareMusic, toast } from '@/utils/tools'
@@ -161,4 +162,8 @@ export const handleToggleSource = async(listId: string, musicInfo: LX.Music.Musi
     }
   })
   return true
+}
+
+export const handleDownload = async(musicInfo: LX.Music.MusicInfoOnline) => {
+  void downloadMusic(musicInfo)
 }

@@ -352,6 +352,16 @@ declare global {
       'download.fileName': '歌名 - 歌手' | '歌手 - 歌名' | '歌名'
 
       /**
+       * 是否启用下载功能
+       */
+      'download.enable': boolean
+
+      /**
+       * 下载保存路径
+       */
+      'download.path': string
+
+      /**
        * 是否启用同步
        */
       'sync.enable': boolean
