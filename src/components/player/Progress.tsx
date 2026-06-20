@@ -8,11 +8,11 @@ import { useTheme } from '@/store/theme/hook'
 
 
 const DefaultBar = memo(() => {
-  // const theme = useTheme()
+  const theme = useTheme()
 
   return <View style={{
     ...styles.progressBar,
-    // backgroundColor: theme['c-primary-light-200-alpha-900'],
+    backgroundColor: theme['c-primary-alpha-700'],
     position: 'absolute',
     width: '100%',
     left: 0,
@@ -23,7 +23,7 @@ const DefaultBar = memo(() => {
 const BufferedBar = memo(({ progress }: { progress: number }) => {
   // console.log(bufferedProgress)
   const theme = useTheme()
-  return <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-light-600-alpha-900'], position: 'absolute', width: `${progress * 100}%`, left: 0, top: 0 }}></View>
+  return <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-alpha-400'], position: 'absolute', width: `${progress * 100}%`, left: 0, top: 0 }}></View>
 })
 
 const PreassBar = memo(({ onDragState, setDragProgress, onSetProgress }: {
@@ -88,7 +88,7 @@ export const ProgressPlain = ({ progress, duration, buffered, paddingTop }: {
       <View style={{ flex: 1 }}>
         <DefaultBar />
         <BufferedBar progress={buffered} />
-        <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-alpha-900'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
+        <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
       </View>
       <View style={styles.pressBar} />
     </View>
@@ -125,11 +125,11 @@ const Progress = ({ progress, duration, buffered, paddingTop }: {
           draging
             ? (
                 <>
-                  <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-light-200-alpha-900'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
-                  <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-light-100-alpha-800'], width: `${dragProgress * 100}%`, position: 'absolute', left: 0, top: 0 }} />
+                  <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-alpha-800'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
+                  <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary'], width: `${dragProgress * 100}%`, position: 'absolute', left: 0, top: 0 }} />
                 </>
               ) : (
-                <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary-alpha-900'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
+                <View style={{ ...styles.progressBar, backgroundColor: theme['c-primary'], width: progressStr, position: 'absolute', left: 0, top: 0 }} />
               )
         }
       </View>
@@ -150,7 +150,7 @@ const styles = createStyle({
   },
   progressBar: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 100,
   },
   pressBar: {
     position: 'absolute',
