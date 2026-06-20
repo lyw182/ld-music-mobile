@@ -18,6 +18,8 @@ import Badge from '@/components/common/Badge'
 import { useSettingValue } from '@/store/setting/hook'
 import playerState from '@/store/player/state'
 import listState from '@/store/list/state'
+import ListMenu, { type ListMenuType, type Position, type SelectInfo } from '@/screens/Home/Views/Mylist/MusicList/ListMenu'
+import { handlePlay as handlePlayList, handlePlayLater, handleRemove, handleShare, handleShowMusicSourceDetail, handleDislikeMusic, handleDownload, handleToggleSource } from '@/screens/Home/Views/Mylist/MusicList/listAction'
 
 const HEADER_HEIGHT = scaleSizeH(_HEADER_HEIGHT)
 const ITEM_HEIGHT = scaleSizeH(LIST_ITEM_HEIGHT)
@@ -30,17 +32,19 @@ type QueueItem = {
   type: 'tempPlay'
   musicInfo: LX.Music.MusicInfo
   tempPlayIndex: number
+  listId: string | null
 }
 
 interface Props {
   componentId: string
 }
 
-const ListItem = ({ item, index, isPlaying, onPress, isShowAlbumName, isShowInterval }: {
+const ListItem = ({ item, index, isPlaying, onPress, onShowMenu, isShowAlbumName, isShowInterval }: {
   item: QueueItem
   index: number
   isPlaying: boolean
   onPress: (item: QueueItem, index: number) => void
+  onShowMenu: (item: QueueItem, index: number, position: { x: number, y: number, w: number, h: number }) => void
   isShowAlbumName: boolean
   isShowInterval: boolean
 }) => {
@@ -50,6 +54,14 @@ const ListItem = ({ item, index, isPlaying, onPress, isShowAlbumName, isShowInte
   const singer = `${musicInfo.singer}${isShowAlbumName && musicInfo.meta.albumName ? ` · ${musicInfo.meta.albumName}` : ''}`
   const isActive = item.type === 'list' && item.originalIndex === playerState.playInfo.playIndex && !playerState.playMusicInfo.isTempPlay
   const isTempPlayActive = item.type === 'tempPlay' && playerState.playMusicInfo.isTempPlay && playerState.playMusicInfo.musicInfo?.id === musicInfo.id
+  const moreButtonRef = useRef<TouchableOpacity>(null)
+  const handleShowMenu = () => {
+    if (moreButtonRef.current?.measure) {
+      moreButtonRef.current.measure((_fx, _fy, width, height, px, py) => {
+        onShowMenu(item, index, { x: Math.ceil(px), y: Math.ceil(py), w: Math.ceil(width), h: Math.ceil(height) })
+      })
+    }
+  }
 
   return (
     <TouchableOpacity
@@ -79,6 +91,9 @@ const ListItem = ({ item, index, isPlaying, onPress, isShowAlbumName, isShowInte
           <Text style={styles.interval} size={12} color={isActive || isTempPlayActive ? theme['c-primary-alpha-400'] : theme['c-250']} numberOfLines={1}>{musicInfo.interval}</Text>
         ) : null
       }
+      <TouchableOpacity onPress={handleShowMenu} ref={moreButtonRef} style={styles.moreButton}>
+        <Icon name="dots-vertical" style={{ color: theme['c-350'] }} size={12} />
+      </TouchableOpacity>
     </TouchableOpacity>
   )
 }
@@ -91,6 +106,7 @@ export default ({ componentId }: Props) => {
   const isShowAlbumName = useSettingValue('list.isShowAlbumName')
   const isShowInterval = useSettingValue('list.isShowInterval')
   const flatListRef = useRef<FlatList>(null)
+  const listMenuRef = useRef<ListMenuType>(null)
   const [queueList, setQueueList] = useState<QueueItem[]>([])
 
   const listId = playInfo.playerListId
@@ -114,6 +130,7 @@ export default ({ componentId }: Props) => {
       type: 'tempPlay' as const,
       musicInfo: item.musicInfo as LX.Music.MusicInfo,
       tempPlayIndex: i,
+      listId: item.listId,
     }))
 
     // 当前歌曲之后的列表
@@ -176,12 +193,25 @@ export default ({ componentId }: Props) => {
     void pop(componentId)
   }
 
+  const showMenu = useCallback((item: QueueItem, _index: number, position: Position) => {
+    const musicInfo = item.musicInfo as LX.Music.MusicInfo
+    const selectInfo: SelectInfo = {
+      musicInfo,
+      index: item.type === 'list' ? item.originalIndex : 0,
+      listId: item.type === 'list' ? (listId ?? '') : (item.listId ?? ''),
+      single: true,
+      selectedList: [musicInfo],
+    }
+    listMenuRef.current?.show(selectInfo, position)
+  }, [listId])
+
   const renderItem = ({ item, index }: { item: QueueItem; index: number }) => (
     <ListItem
       item={item}
       index={index}
       isPlaying={playerState.isPlay}
       onPress={handlePlay}
+      onShowMenu={showMenu}
       isShowAlbumName={isShowAlbumName}
       isShowInterval={isShowInterval}
     />
@@ -231,6 +261,21 @@ export default ({ componentId }: Props) => {
               <Text color={theme['c-500']}>{t('play_queue_empty')}</Text>
             </View>
       }
+      <ListMenu
+        ref={listMenuRef}
+        onPlay={info => { handlePlayList(info.listId, info.index) }}
+        onPlayLater={info => { handlePlayLater(info.listId, info.musicInfo, info.selectedList, () => {}) }}
+        onDownload={info => { void handleDownload(info.musicInfo) }}
+        onCopyName={info => { handleShare(info.musicInfo) }}
+        onMusicSourceDetail={info => { void handleShowMusicSourceDetail(info.musicInfo) }}
+        onDislikeMusic={info => { void handleDislikeMusic(info.musicInfo) }}
+        onRemove={info => { handleRemove(info.listId, info.musicInfo, info.selectedList, () => {}) }}
+        onAdd={() => {}}
+        onMove={() => {}}
+        onEditMetadata={() => {}}
+        onChangePosition={() => {}}
+        onToggleSource={info => { void handleToggleSource(info.listId, info.musicInfo, info.musicInfo.meta.toggleMusicInfo as LX.Music.MusicInfoOnline) }}
+      />
     </View>
   )
 }
@@ -286,6 +331,12 @@ const styles = createStyle({
   },
   interval: {
     paddingRight: 8,
+  },
+  moreButton: {
+    height: '80%',
+    paddingLeft: 12,
+    paddingRight: 12,
+    justifyContent: 'center',
   },
   empty: {
     flex: 1,
