@@ -119,6 +119,7 @@ export default ({ componentId }: Props) => {
     const musicList = getListMusicSync(listId)
     const playIndex = playInfo.playIndex
     const tempPlayList = playerState.tempPlayList
+    const playMusicInfo = playerState.playMusicInfo
 
     // 当前歌曲之前（含当前歌曲）的列表
     const beforeItems: QueueItem[] = musicList
@@ -132,6 +133,20 @@ export default ({ componentId }: Props) => {
       tempPlayIndex: i,
       listId: item.listId,
     }))
+
+    // 如果当前正在播放的是稍后播放歌曲，且该歌曲已从 tempPlayList 中移除，需要将其补回到队列头部
+    if (playMusicInfo.isTempPlay && playMusicInfo.musicInfo) {
+      const currentId = playMusicInfo.musicInfo.id
+      const alreadyInList = tempPlayItems.some(item => item.musicInfo.id === currentId)
+      if (!alreadyInList) {
+        tempPlayItems.unshift({
+          type: 'tempPlay' as const,
+          musicInfo: playMusicInfo.musicInfo as LX.Music.MusicInfo,
+          tempPlayIndex: -1, // -1 表示当前正在播放，不在 tempPlayList 中
+          listId: playMusicInfo.listId,
+        })
+      }
+    }
 
     // 当前歌曲之后的列表
     const afterItems: QueueItem[] = musicList
@@ -151,19 +166,28 @@ export default ({ componentId }: Props) => {
     const handleTempPlayListUpdate = () => {
       buildQueueList()
     }
+    const handlePlayMusicInfoUpdate = () => {
+      buildQueueList()
+    }
     global.app_event.on('myListMusicUpdate', handleListUpdate)
     global.state_event.on('playTempPlayListChanged', handleTempPlayListUpdate)
+    global.state_event.on('playMusicInfoChanged', handlePlayMusicInfoUpdate)
     return () => {
       global.app_event.off('myListMusicUpdate', handleListUpdate)
       global.state_event.off('playTempPlayListChanged', handleTempPlayListUpdate)
+      global.state_event.off('playMusicInfoChanged', handlePlayMusicInfoUpdate)
     }
   }, [buildQueueList])
 
   // Scroll to current playing song
   useEffect(() => {
-    const currentIndex = queueList.findIndex(item =>
-      item.type === 'list' && item.originalIndex === playInfo.playIndex
-    )
+    const currentIndex = queueList.findIndex(item => {
+      if (item.type === 'list') {
+        return item.originalIndex === playInfo.playIndex && !playerState.playMusicInfo.isTempPlay
+      } else {
+        return playerState.playMusicInfo.isTempPlay && playerState.playMusicInfo.musicInfo?.id === item.musicInfo.id
+      }
+    })
     if (currentIndex > -1 && queueList.length > 0) {
       try {
         flatListRef.current?.scrollToIndex({
@@ -180,6 +204,8 @@ export default ({ componentId }: Props) => {
       if (!listId) return
       void playList(listId, item.originalIndex)
     } else {
+      // tempPlayIndex === -1 表示当前正在播放的稍后播放歌曲，已不在 tempPlayList 中，无需操作
+      if (item.tempPlayIndex === -1) return
       // 点击稍后播放歌曲：移除该歌曲之前的所有 tempPlayList 项，使目标成为第一项，然后通过 playNext 播放
       for (let i = 0; i < item.tempPlayIndex; i++) {
         removeTempPlayList(0)
