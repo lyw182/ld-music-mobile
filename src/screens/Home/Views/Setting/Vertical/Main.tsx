@@ -11,6 +11,7 @@ import Backup from '../settings/Backup'
 import Other from '../settings/Other'
 import Version from '../settings/Version'
 import About from '../settings/About'
+import Download from '../settings/Download'
 import { createStyle } from '@/utils/tools'
 import { SETTING_SCREENS, type SettingScreenIds } from '../Main'
 
@@ -32,6 +33,7 @@ const ListItem = memo(({
 }: { id: SettingScreenIds }) => {
   switch (id) {
     case 'player': return <Player />
+    case 'download': return <Download />
     case 'lyric_desktop': return <LyricDesktop />
     case 'search': return <Search />
     case 'list': return <List />
