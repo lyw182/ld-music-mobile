@@ -39,18 +39,38 @@ export default memo(() => {
     updateSetting({ 'download.path': path })
   }
 
+  const styles = createStyle({
+    pathContainer: {
+      flexDirection: 'column',
+      gap: 8,
+    },
+    pathBar: {
+      flex: 1,
+      height: 36,
+      paddingHorizontal: 10,
+      borderRadius: 4,
+      borderWidth: 1,
+      justifyContent: 'center',
+    },
+    btn: {
+      flexDirection: 'row',
+    },
+  });
+
   return (
     <>
       <SubTitle title={t('setting_download_path')}>
         <View style={styles.pathContainer}>
-          <View style={{ ...styles.pathBar, backgroundColor: theme['c-content-background'], borderColor: theme['c-border-background'] }}>
+          <View style={{ ...styles.pathBar, backgroundColor: theme['c-border-background'], borderColor: theme['c-border-background'] }}>
             {downloadPath ? (
               <Text size={13} color={theme['c-font']} numberOfLines={1}>{downloadPath}</Text>
             ) : (
               <Text size={13} color={theme['c-400']}>{t('setting_download_path_empty')}</Text>
             )}
           </View>
-          <Button onPress={handleSelectPath}>{t('setting_download_path_select')}</Button>
+          <View style={styles.btn}>
+            <Button onPress={handleSelectPath}>{t('setting_download_path_select')}</Button>
+          </View>
         </View>
       </SubTitle>
       {
@@ -60,19 +80,4 @@ export default memo(() => {
       }
     </>
   )
-})
-
-const styles = createStyle({
-  pathContainer: {
-    flexDirection: 'column',
-    gap: 8,
-  },
-  pathBar: {
-    flex: 1,
-    height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    borderWidth: 1,
-    justifyContent: 'center',
-  },
 })
